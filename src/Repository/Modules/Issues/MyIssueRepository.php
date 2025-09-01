@@ -3,11 +3,7 @@
 namespace App\Repository\Modules\Issues;
 
 use App\Entity\Modules\Issues\MyIssue;
-use App\Entity\Modules\Issues\MyIssueContact;
-use App\Entity\Modules\Issues\MyIssueProgress;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\OptimisticLockException;
-use Doctrine\ORM\ORMException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -24,6 +20,35 @@ class MyIssueRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MyIssue::class);
+    }
+
+    /**
+     * @param bool  $includeDeleted
+     * @param array $includedIds
+     *
+     * @return array
+     */
+    public function findAllAssignable(bool $includeDeleted = false, array $includedIds = []): array
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $qb->select("mi")
+            ->from(MyIssue::class, "mi")
+            ->where("1=1");
+
+        if (!$includeDeleted) {
+            $qb->andWhere("mi.deleted = 0");
+        }
+
+        if (!empty($includedIds)) {
+            $qb->andWhere($qb->expr()->orX(
+                'mi.todo IS NULL',
+                'mi.id IN (:includedIds)'
+            ))->setParameter('includedIds', $includedIds);
+        } else {
+            $qb->andWhere('mi.todo IS NULL');
+        }
+
+        return $qb->getQuery()->execute();
     }
 
     /**
@@ -68,58 +93,6 @@ class MyIssueRepository extends ServiceEntityRepository
     /**
      * @return MyIssue[]
      */
-    public function findAllNotDeletedAndResolved(): array
-    {
-        $alias        = self::MY_ISSUE_TABLE_ALIAS;
-        $queryBuilder = $this->_em->createQueryBuilder();
-
-        $queryBuilder->select($alias)
-            ->from(MyIssue::class, $alias);
-
-        $queryBuilder = $this->filterQueryBuilderResultByNotDeletedAndResolved($queryBuilder, $alias, false);
-
-        $query   = $queryBuilder->getQuery();
-        $results = $query->execute();
-
-        return $results;
-    }
-
-    /**
-     * @param MyIssue $issue
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    public function saveIssue(MyIssue $issue)
-    {
-        $this->_em->persist($issue);
-        $this->_em->flush();
-    }
-
-    /**
-     * @param MyIssueContact $myIssueContact
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    public function saveIssueContact(MyIssueContact $myIssueContact): void
-    {
-        $this->_em->persist($myIssueContact);
-        $this->_em->flush();
-    }
-
-    /**
-     * @param MyIssueProgress $myIssueProgress
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    public function saveIssueProgress(MyIssueProgress $myIssueProgress): void
-    {
-        $this->_em->persist($myIssueProgress);
-        $this->_em->flush();
-    }
-
-    /**
-     * @return MyIssue[]
-     */
     public function getPendingIssuesForDashboard(): array
     {
         $results = $this->findBy([
@@ -147,31 +120,4 @@ class MyIssueRepository extends ServiceEntityRepository
         return $queryBuilder;
     }
 
-    /**
-     * @param QueryBuilder $queryBuilder
-     * @param string $tableAlias
-     * @param bool $isAnd
-     * @return QueryBuilder
-     */
-    private function filterQueryBuilderResultByNotDeletedAndResolved(QueryBuilder $queryBuilder, string $tableAlias, bool $isAnd = true): QueryBuilder
-    {
-        if($isAnd){
-            $queryBuilder->andWhere("{$tableAlias}." . MyIssue::FIELD_NAME_DELETED  . " = 0");
-        }else{
-            $queryBuilder->where("{$tableAlias}." . MyIssue::FIELD_NAME_DELETED  . " = 0");
-        }
-
-        $queryBuilder->andWhere("{$tableAlias}." . MyIssue::FIELD_NAME_RESOLVED . " = 1");
-        return $queryBuilder;
-    }
-
-    /**
-     * Returns one Entity or null for given id
-     * @param int $entityId
-     * @return MyIssue|null
-     */
-    public function findIssueById(int $entityId): ?MyIssue
-    {
-        return $this->find($entityId);
-    }
 }

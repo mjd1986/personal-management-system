@@ -3,7 +3,6 @@
 namespace App\Controller\Modules;
 
 use App\Controller\Core\Env;
-use App\Controller\System\ModuleController;
 use App\Entity\Modules\Achievements\Achievement;
 use App\Entity\Modules\Contacts\MyContact;
 use App\Entity\Modules\Issues\MyIssue;
@@ -17,8 +16,6 @@ use App\Services\Files\FilesHandler;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 /**
- * Todo: merge with @see ModuleController
- *
  * Class ModulesController
  * @package App\Controller\Modules
  */
@@ -40,6 +37,8 @@ class ModulesController extends AbstractController {
     const MODULE_NAME_TRAVELS                   = "My Travels";
     const MODULE_NAME_ISSUES                    = "My Issues";
     const MENU_NODE_MODULE_NAME_REPORTS         = "My Reports";
+    public const MODULE_NAME_SYSTEM = "System";
+    public const MODULE_NAME_STORAGE = "Storage";
 
     const MODULE_ENTITY_NOTES_CATEGORY          = "My Notes Categories"; //todo: rename this const + twig (subentity) or menu node
 

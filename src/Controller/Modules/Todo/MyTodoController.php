@@ -6,11 +6,12 @@ use App\Controller\Core\Application;
 use App\Controller\Modules\Issues\MyIssuesController;
 use App\Controller\Modules\ModulesController;
 use App\Controller\System\LockedResourceController;
-use App\Controller\System\ModuleController;
-use App\DTO\EntityDataDto;
 use App\Entity\Interfaces\Relational\RelatesToMyTodoInterface;
 use App\Entity\Modules\Todo\MyTodo;
 use App\Entity\System\LockedResource;
+use App\Enum\RelatableModuleEnum;
+use App\Repository\Modules\Issues\MyIssueRepository;
+use App\Repository\System\ModuleRepository;
 use App\Services\Core\Logger;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Exception;
@@ -27,11 +28,6 @@ class MyTodoController extends AbstractController {
     private $app;
 
     /**
-     * @var ModuleController $moduleController
-     */
-    private ModuleController $moduleController;
-
-    /**
      * @var MyIssuesController $issuesController
      */
     private MyIssuesController $issuesController;
@@ -41,11 +37,16 @@ class MyTodoController extends AbstractController {
      */
     private LockedResourceController $lockedResourceController;
 
-    public function __construct(Application $app, ModuleController $moduleController, MyIssuesController $issuesController, LockedResourceController $lockedResourceController)
+    public function __construct(
+        Application $app,
+        MyIssuesController $issuesController,
+        LockedResourceController $lockedResourceController,
+        private readonly ModuleRepository $moduleRepository,
+        private readonly MyIssueRepository $issueRepository,
+    )
     {
         $this->app                      = $app;
         $this->issuesController         = $issuesController;
-        $this->moduleController         = $moduleController;
         $this->lockedResourceController = $lockedResourceController;
     }
 
@@ -91,13 +92,9 @@ class MyTodoController extends AbstractController {
         $groupedEntities = [];
         $allEntities     = $this->getAll($deleted);
 
-        foreach($allEntities as $entity){
-
-            $moduleName = ( is_null($entity->getModule()) ? null : $entity->getModule()->getName()) ;
-            if(
-                    !is_null($moduleName)
-                &&  !$this->lockedResourceController->isAllowedToSeeResource("", LockedResource::TYPE_ENTITY, $moduleName, false)
-            ){
+        foreach ($allEntities as $entity) {
+            $moduleName = (is_null($entity->getModule()) ? null : $entity->getModule()->getName());
+            if (!is_null($moduleName) && !$this->lockedResourceController->isAllowedToSeeResource("", LockedResource::TYPE_ENTITY,$moduleName, false)) {
                 continue;
             }
 
@@ -209,40 +206,88 @@ class MyTodoController extends AbstractController {
     }
 
     /**
-     * Will return all entities which can relate with `todo` for given modules
-     * @return EntityDataDto[]
+     * Returns array of modules with underlying entries that can be related to the todo module
+     *
+     * @return array|array[]
      */
-    public function getAllRelatableEntitiesDataDtosForModulesNames(): array
+    public function getPossibleRelationEntries(array $includedIds = []): array
     {
-        $allModules                       = $this->moduleController->getAllActive();
-        $relatableEntitiesForModulesNames = [];
+        $allEntries = [
+            'modules' => [],
+        ];
 
-        foreach( $allModules as $module ){
-            $moduleName = $module->getName();
+        // can relate to module only
+        $goalModule = $this->moduleRepository->getOneByName(RelatableModuleEnum::MY_GOALS->value);
+        if ($goalModule) {
+            $moduleData = [
+                'id'   => $goalModule->getId(),
+                'name' => $goalModule->getName(),
+            ];
 
-            switch( $moduleName ){
-                case ModulesController::MODULE_NAME_ISSUES:
-                {
-                    $allNotDeletedIssues = $this->issuesController->findAllNotDeletedAndNotResolved();
-
-                    foreach( $allNotDeletedIssues as $issueEntity ){
-                        $entityDataDto = new EntityDataDto();
-                        $entityDataDto->setId($issueEntity->getId());
-                        $entityDataDto->setName($issueEntity->getName());
-
-                        if( !empty($issueEntity->getTodo()) ){
-                            $entityDataDto->setActive(false);;
-                        }
-
-                        $relatableEntitiesForModulesNames[$moduleName][] = $entityDataDto;
-                    }
-                }
-                break;
-            }
-
+            $allEntries['modules'][] = $moduleData;
         }
 
-        return $relatableEntitiesForModulesNames;
+        // can relate to module and entries
+        $issuesModule = $this->moduleRepository->getOneByName(RelatableModuleEnum::MY_ISSUES->value);
+        if ($issuesModule) {
+            $moduleData = [
+                'id'   => $issuesModule->getId(),
+                'name' => $issuesModule->getName(),
+            ];
+
+            $entries = [];
+            $issues  = $this->issueRepository->findAllAssignable(false, $includedIds);
+            foreach ($issues as $issue) {
+                $entries[] = [
+                    'id'   => $issue->getId(),
+                    'name' => $issue->getName(),
+                ];
+            }
+
+            $moduleData['entries']   = $entries;
+            $allEntries['modules'][] = $moduleData;
+        }
+
+        return $allEntries;
+    }
+
+    /**
+     * @param MyTodo[] $allTodo
+     *
+     * @return array
+     */
+    public function buildFrontDataArray(array $allTodo): array
+    {
+        $entriesData = [];
+        foreach($allTodo as $todo){
+            $elements = [];
+            foreach ($todo->getMyTodoElement() as $element) {
+                if ($element->isDeleted()) {
+                    continue;
+                }
+
+                $elements[] = [
+                    'id' => $element->getId(),
+                    'name' => $element->getName() ?? '',
+                    'isDone' => $element->getCompleted() ?? false,
+                ];
+            }
+
+            $entriesData[] = [
+                'id'              => $todo->getId(),
+                'name'            => $todo->getName() ?? '',
+                'description'     => $todo->getDescription() ?? '',
+                'showOnDashboard' => $todo->getDisplayOnDashboard() ?? false,
+                'elements'        => $elements,
+                'module'          => [
+                    'id'   => $todo->getModule()?->getId() ?? null,
+                    'name' => $todo->getModule()?->getName() ?? null,
+                    'entryId' => $todo->getRelatedEntityId()
+                ],
+            ];
+        }
+
+        return $entriesData;
     }
 
 }
