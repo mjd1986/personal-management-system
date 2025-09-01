@@ -3,8 +3,9 @@
 namespace App\Command\Crons;
 
 use App\Controller\Core\Application;
-use App\Controller\Core\Controllers;
 use App\DTO\Modules\Schedules\IncomingScheduleDTO;
+use App\Repository\Modules\Schedules\MyScheduleReminderRepository;
+use App\Repository\Modules\Schedules\MyScheduleRepository;
 use App\Response\BaseResponse;
 use App\Services\External\NotifierProxyLoggerService;
 use Exception;
@@ -43,17 +44,16 @@ class CronTransferSchedulesToNotifierProxyLoggerCommand extends Command
      */
     private NotifierProxyLoggerService $notifierProxyLoggerService;
 
-    /**
-     * @var Controllers $controllers
-     */
-    private Controllers $controllers;
-
-    public function __construct(Application $app, NotifierProxyLoggerService $notifierProxyLoggerService, Controllers $controllers)
+    public function __construct(
+        Application $app,
+        NotifierProxyLoggerService $notifierProxyLoggerService,
+        private readonly MyScheduleReminderRepository $scheduleReminderRepository,
+        private readonly MyScheduleRepository $myScheduleRepository
+    )
     {
         parent::__construct(self::$defaultName);
 
         $this->app                        = $app;
-        $this->controllers                = $controllers;
         $this->notifierProxyLoggerService = $notifierProxyLoggerService;
     }
 
@@ -93,7 +93,7 @@ class CronTransferSchedulesToNotifierProxyLoggerCommand extends Command
         try{
             $this->app->logger->info("Started transferring the schedules to npl");
             {
-                $incomingSchedulesDTOS = $this->app->repositories->myScheduleRepository->getSchedulesWithRemindersInformation();
+                $incomingSchedulesDTOS = $this->myScheduleRepository->getSchedulesWithRemindersInformation();
 
                 if( empty($incomingSchedulesDTOS) ){
                     $this->app->logger->info("No schedules were found to transfer");
@@ -105,9 +105,9 @@ class CronTransferSchedulesToNotifierProxyLoggerCommand extends Command
                     $response = $this->handleTransferForChannel($incomingScheduleDTO);
 
                     if($response->isSuccess()){
-                        $reminder = $this->controllers->getMyScheduleReminderController()->findOneById($incomingScheduleDTO->getReminderId());
+                        $reminder = $this->scheduleReminderRepository->findOneById($incomingScheduleDTO->getReminderId());
                         $reminder->setProcessed(true);
-                        $this->controllers->getMyScheduleReminderController()->saveReminder($reminder);
+                        $this->scheduleReminderRepository->saveReminder($reminder);
                     }
                 }
             }

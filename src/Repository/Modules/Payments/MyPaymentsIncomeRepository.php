@@ -3,7 +3,6 @@
 namespace App\Repository\Modules\Payments;
 
 use App\Entity\Modules\Payments\MyPaymentsIncome;
-use App\Repository\AbstractRepository;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Exception;
 use Doctrine\Persistence\ManagerRegistry;
@@ -27,7 +26,7 @@ class MyPaymentsIncomeRepository extends ServiceEntityRepository {
      */
     public function getAllNotDeleted(): array
     {
-        return $this->findBy([AbstractRepository::FIELD_DELETED => 0]);
+        return $this->findBy(['deleted' => 0], ["date" => "DESC"]);
     }
 
     /**
@@ -48,7 +47,9 @@ class MyPaymentsIncomeRepository extends ServiceEntityRepository {
             WHERE 1
             AND `deleted` = 0
             
-            GROUP BY DATE_FORMAT(`date`, "%Y-%m");        
+            GROUP BY DATE_FORMAT(`date`, "%Y-%m")
+
+            ORDER BY `date` DESC
         ';
 
         $results = $this->_em->getConnection()->fetchAllAssociative($sql);
@@ -63,17 +64,6 @@ class MyPaymentsIncomeRepository extends ServiceEntityRepository {
         }
 
         return $returnedResult;
-    }
-
-    /**
-     * Will return one record or null if nothing was found
-     *
-     * @param int $id
-     * @return MyPaymentsIncome|null
-     */
-    public function findOneById(int $id): ?MyPaymentsIncome
-    {
-        return $this->find($id);
     }
 
 }

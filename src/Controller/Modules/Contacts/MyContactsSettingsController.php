@@ -2,21 +2,17 @@
 
 namespace App\Controller\Modules\Contacts;
 
-use App\Controller\Core\Application;
 use App\DTO\Modules\Contacts\ContactsTypesDTO;
 use App\Entity\Modules\Contacts\MyContactType;
+use App\Repository\Modules\Contacts\MyContactRepository;
 use Exception;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class MyContactsSettingsController extends AbstractController {
 
-    /**
-     * @var Application
-     */
-    private $app;
-
-    public function __construct(Application $app) {
-        $this->app = $app;
+    public function __construct(
+        private readonly MyContactRepository $contactRepository
+    ) {
     }
 
     /**
@@ -31,11 +27,11 @@ class MyContactsSettingsController extends AbstractController {
         $newContactTypeName      = $entityAfterUpdate->getName();
         $newContactTypeImagePath = $entityAfterUpdate->getImagePath();
 
-        $contactsToUpdate = $this->app->repositories->myContactRepository->findContactsWithContactTypeByContactTypeName($previousContactTypeName);
+        $contactsToUpdate = $this->contactRepository->findContactsWithContactTypeByContactTypeName($previousContactTypeName);
 
         foreach($contactsToUpdate as $contactToUpdate)
         {
-            $contactsTypesDtos = $contactToUpdate->getContacts()->getContactTypeDtos();
+            $contactsTypesDtos = $contactToUpdate->getContactTypesDto()->getContactTypeDtos();
 
             foreach($contactsTypesDtos as $index => $contactTypeDto){
                 if( strtolower($contactTypeDto->getName()) === strtolower($previousContactTypeName) )
@@ -52,7 +48,7 @@ class MyContactsSettingsController extends AbstractController {
             $json = $contactsTypesDto->toJson();
 
             $contactToUpdate->setContacts($json);
-            $this->app->repositories->myContactRepository->saveEntity($contactToUpdate);
+            $this->contactRepository->saveEntity($contactToUpdate);
         }
     }
 

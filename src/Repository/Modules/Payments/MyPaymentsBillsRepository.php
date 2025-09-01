@@ -24,19 +24,8 @@ class MyPaymentsBillsRepository extends ServiceEntityRepository
      */
     public function getAllNotDeleted(): array
     {
-        $entities = $this->findBy([MyPaymentsBills::FIELD_DELETED => 0], [MyPaymentsBills::FIELD_ID => "DESC"]);
+        $entities = $this->findBy([MyPaymentsBills::FIELD_DELETED => 0], ["startDate" => "DESC"]);
         return $entities;
-    }
-
-    /**
-     * Will return one record or null if nothing was found
-     *
-     * @param int $id
-     * @return MyPaymentsBills|null
-     */
-    public function findOneById(int $id): ?MyPaymentsBills
-    {
-        return $this->find($id);
     }
 
 }

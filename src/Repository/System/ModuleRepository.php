@@ -20,27 +20,23 @@ class ModuleRepository extends ServiceEntityRepository
     }
 
     /**
-     * Will return all active modules;
-     *
-     * @return Module[]
-     */
-    public function getAllActive(): array
-    {
-        $modules = $this->findBy([
-            Module::FIELD_ACTIVE => true
-        ]);
-
-        return $modules;
-    }
-
-    /**
      * Return single module entity by module name
      *
      * @param string $name
-     * @return Module
+     * @param bool   $includeInactive
+     *
+     * @return Module|null
      */
-    public function getOneByName(string $name): Module
+    public function getOneByName(string $name, bool $includeInactive = false): ?Module
     {
-        return $this->findOneBy([Module::FIELD_NAME => $name]);
+        $params = [];
+        if (!$includeInactive) {
+            $params = ['active' => true];
+        }
+
+        return $this->findOneBy([
+            'name' => $name,
+            ...$params,
+        ]);
     }
 }
